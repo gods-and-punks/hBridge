@@ -1,127 +1,83 @@
-//   FILE: groupProject2.nxc
-//   AUTH: Ginger Wilkins, Edgar Salas-Sanchez
-//   DATE: 12/03/2018
-//   DESC: USER CONTROLLOED MOTOR DRIVER USING 12 DIGIT KEYPAD AS CONTROLLER.
-//         SIGNAL IS PASSED THROUGH PCF8574A PINS TO H-BRIDGE TO CONTROL DC MOTOR
-//         DIRECTION (CW, CCW, FREE SPIN, or BRAKE). THE DIRECTION OF THE MOTOR
-//         IS DISPLAYED ON THE NXT BRIXK LCD SCREEN. KEYPAD BUTTONS FOR CONTROL
-//         ARE AS FOLLOWS:
-//         2 = FREE SPIN
-//         4 = CW ROTATION
-//         6 = CCW ROTATION
-//         8 = BRAKE
+//	File: dioDipLed2_0.nxc
+//	Auth: Edgar Salas-Sanchez
+//	Date: 11/25/2018
+//	Vers: 1.1a - PCF8574A read DIP switch and light LED. Uses bitwise shift.
+//	      1.1b - same but doesn't use bitwise shift; I want yo confirm my underrstanding.
+//	      2.0 - same but refer to dioOutput2_0 and dioInput2_0.
+//	Desc: LEDs configured to sink (i.e. when bit is "O" then LED lights up)
+//	      DIP switch configured with pull-up resistors.
+//	Note: Uses PCF8574A chip (hence address A2=A1=A0 set to 0=0=0 hence 0x70)
 
-#define I2Cport S1                         //port number for keypad
-#define I2Cport2 S2                        //port number for motor
-#define I2CAddr8574 0x70                   //I2C adress 0x40 8574 or 0x70 8574A
-
-//global variable
-//array variables (since NXC's I2C functions take array variables)
-byte WriteBuf[] = {I2CAddr8574, 0x00};    //sets up PCF8574A for writing
-byte WriteBuf2[]= {I2CAddr8574, 0x00};
-byte ReadBuf[];                            //data received from PCF8574A. Won't be reading any adata but need this for I2CBytes
-byte ReadBuf2[];
-int RdCnt = 1;                             //number of bytes to read.
-
-void motorDrive(byte motorVal)
-{
-     WriteBuf2[1] = motorVal;
-     I2CBytes(I2Cport2, WriteBuf2,RdCnt, ReadBuf2);
-}
-
-long GetKey()
-{
-     WriteBuf[1] = 0xDF; //col1: 0xFB = 251 decimal = 1111 011 1; Sets col 1 HI
-     I2CBytes(I2Cport, WriteBuf,RdCnt, ReadBuf);
-
-     if(ReadBuf[0] == 0xDD) return(1);     //row 1, "1" key, 187, 0111 011 1
-     if(ReadBuf[0] == 0xDB) return(4);     //row 2, "4" key, 219, 1011 011 1
-     if(ReadBuf[0] == 0xD7) return(7);     //row 3, "7" key, 235, 1101 011 1
-     if(ReadBuf[0] == 0xCF) return(14);    //row 4, "*" key, 243, 1110 011 1
-
-     WriteBuf[1] = 0xBF; //col1: 0xFD = 253 decimal = 1111 101 1; Sets col 2 HI
-     I2CBytes(I2Cport, WriteBuf,RdCnt, ReadBuf);
-
-     if(ReadBuf[0] == 0xBD) return(2);     //row 1, "2" key, 189, 1 0111 101
-     if(ReadBuf[0] == 0xBB) return(5);     //row 2, "5" key, 221, 1 1011 101
-     if(ReadBuf[0] == 0xB7) return(8);     //row 3, "8" key, 237, 1 1101 101
-     if(ReadBuf[0] == 0xAF) return(16);    //row 4, "0" key, 245, 1 1110 101
-
-     WriteBuf[1] = 0x7F; //col3: 0xFE = 254 decimal = 1111 110 1; Sets col 3 HI
-     I2CBytes(I2Cport, WriteBuf,RdCnt, ReadBuf);
-
-     if(ReadBuf[0] == 0x7D) return(3);     //row 1, "3" key, 190, 1 0111 110
-     if(ReadBuf[0] == 0x7B) return(6);     //row 2, "6" key, 222, 1 1011 110
-     if(ReadBuf[0] == 0x77) return(9);     //row 3, "9" key, 238, 1 1101 110
-     if(ReadBuf[0] == 0x6F) return(18);    //row 4, "#" key, 246, 1 1110 110
-
-     return(-1); //if no key pressed
-
-} //end of GetKey
-
-long SetKey()
-{
-     long key;
-     string keypad = "Press a key";
-     byte Val = 0x00;
-     string direction;
-     
-     SetSensorLowspeed(I2Cport);           //PCF8574A connect to NXT on S1
-     SetSensorLowspeed(I2Cport2);          //
-
-     TextOut(0,LCD_LINE1,keypad);          //show initial value
-     while(true)
-     {
-          while(GetKey() < 0);             //do nothing unless a key is pressed
-
-          key = GetKey();                  //get key value
-          PlayTone(1000,5);                //make key pressed sound
-          switch(key)                      //case based on key value
-          {
-               case -1:              //no key, do nothing
-                    break;
-               case 2:               //"2" key, free spin
-                    Val = 0x0A;      //D1 & D3 set HI
-
-                    direction = "Free Spin";
-                    keypad = "2";
-                    break;
-               case 4:               //'4" key, rotate CW
-                    Val = 0x0C;      //D2 & D3 set HI
-                                     //D0 & D1 set LO
-                    direction = "Go CW";
-                    keypad = "4";
-                    break;
-               case 6:               //'6" key, rotate CCW
-                    Val = 0x03;      //D2 & D3 set HI
-                                     //D0 & D1 set LO
-                    direction = "Go CCW";
-                    keypad = "6";
-                    break;
-               case 8:               //'8" key, brake
-                    Val = 0x0F;      //D2 & D3 set HI
-                                     //D0 & D1 set LO
-                    direction = "BRAKE";
-                    keypad = "8";
-                    break;
-               default:              //do nothing for keys besides "2", "4", "6", or "8" pressed
-                                     //D0, D1, D2,  & D3 set LO
-                    keypad = "Wrong Key";
-                    PlayTone(500,5);
-                    break;
-          }
-          ClearScreen();
-          Wait(10);
-          motorDrive(Val);
-          TextOut(0,LCD_LINE1,keypad);
-          TextOut(0,LCD_LINE3,direction);
-          Wait(10);
-          while(GetKey() >= 0);            //wait for key to be unpressed
-     }//end of while
-}
+#define I2CAddr8574 0x70		//0x40 8574 or 0x70 8574A. NB: 0x70 = 0111 0000
 
 task main()
 {
-     SetKey();       //call SetKey routine
-}                    //end of main
+	//array variables (since NXC's I2C functions take array variables)
+	byte WriteBuf[2];		//set up two one-byte variables
+	byte ReadBuf[];			//Byte received from PCF8574
+	int RdCnt = 1;			//number of bytes read
 
+	//button variables
+	bool orangeButtonPushed, rightArrowButtonPushed;
+	//counting variables
+	int decimalNumber;		//values 0 to 255
+  int controlVal;
+  int nbytes;
+	byte value = 0;
+
+	SetSensorLowspeed(S1);		//PCF8574A connect to NXT S1
+	//(1) Set adress of PCF8574A (i.e. 0x70) and memory register.
+	WriteBuf[0] = I2CAddr8574;	//this is the address 0x70
+	WriteBuf[1] = 0xFF;		//WriteBuf[1] is the register; filling it with ones sets the port for reading.
+	I2CBytes(S1, WriteBuf, RdCnt, ReadBuf);	//OK, now port set up for reading.
+
+	TextOut (0, LCD_LINE1, "Right Btn starts");
+	do
+	{
+		rightArrowButtonPushed = ButtonPressed(BTNRIGHT, FALSE);
+	} while(!rightArrowButtonPushed);	//end do
+	TextOut (0, LCD_LINE1, "Orange button quits");
+
+	do
+	{
+		orangeButtonPushed = ButtonPressed(BTNCENTER, FALSE);
+		//if pressed, then orange button becomes TRUE.
+		//if not pressed, then orange button is FALSE.
+
+		//(2) Set up to read the PCF8574A port.
+		WriteBuf[0] = I2CAddr8574;
+		WriteBuf[1] = 0xFF;		//set up to read port.
+		I2CBytes(S1, WriteBuf, RdCnt, ReadBuf);
+		//(3) ReadBuf[0] should now have data that was read froim port.
+		decimalNumber = ReadBuf[0];	//value from PCF8574
+		TextOut(0, LCD_LINE3, FormatNum("Value Read: %3d", decimalNumber));
+
+		//play beep for switch 1 being closed.
+		if((decimalNumber > 1) || (decimalNumber < 1))
+		{
+      //(4) Now write to port, thus lighting up corresponding LEDs by writting zeros to port.
+      controlVal = 0;
+      WriteBuf[0] = I2CAddr8574;
+		  WriteBuf[1] = controlVal;               //writting LOW to D0
+		  I2CBytes(S1, WriteBuf, RdCnt, ReadBuf);
+			//PlaySound(SOUND_LOW_BEEP);
+			Wait(100);
+		}
+    else
+    {
+      //(4) Now write to port, thus lighting up corresponding LEDs by writting zeros to port.
+      controlVal = 255;
+      WriteBuf[0] = I2CAddr8574;
+		  WriteBuf[1] = controlVal;               //writting HI to D0
+		  I2CBytes(S1, WriteBuf, RdCnt, ReadBuf);
+			//PlaySound(SOUND_LOW_BEEP);
+			Wait(100);
+    }			//end if
+
+		Wait(50);		//wait 50 milliseconds
+
+	} while(!orangeButtonPushed);	//end do
+
+	TextOut(0, LCD_LINE5, "Finished!");
+	//PlaySound(SOUND_DOUBLE_BEEP);
+}					//end main
